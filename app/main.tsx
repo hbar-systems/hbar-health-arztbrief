@@ -6,7 +6,10 @@
 
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
+// HashRouter, not BrowserRouter — the app runs as a brain-app iframe served
+// from /api/bf/apps/<id>/; path-based routing can't know that prefix, hash
+// routing is self-contained and works from any base path.
+import { HashRouter, Routes, Route, Link, useLocation } from "react-router-dom";
 import type { AnamneseInput, ZeitlicherVerlauf, Unsicherheit } from "./inputSchema";
 import { generateDraft, type GenerateResult } from "./generateDraft";
 import { type Lang, getStoredLang, storeLang, t, type Strings } from "./i18n";
@@ -471,7 +474,7 @@ function App() {
 
 const root = createRoot(document.getElementById("root")!);
 root.render(
-  <BrowserRouter>
+  <HashRouter>
     <App />
-  </BrowserRouter>
+  </HashRouter>
 );
