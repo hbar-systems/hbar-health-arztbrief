@@ -7,6 +7,7 @@ import type { AnamneseInput } from "./inputSchema";
 import { validateInput, enforceDraft } from "./constraints";
 import { renderTemplate, type GeneratedSections } from "./template";
 import { postprocess } from "./postprocess";
+import { llmComplete } from "./brainBridge";
 
 export interface GenerateResult {
   success: boolean;
@@ -17,25 +18,34 @@ export interface GenerateResult {
 }
 
 // ---------------------------------------------------------------------------
-// LLM stub — replace with actual API call
+// LLM call — via the brain-app bridge
 // ---------------------------------------------------------------------------
 
-async function callLLM(_prompt: string): Promise<string> {
-  // TODO: wire up actual LLM endpoint (OpenAI, Anthropic, local, etc.)
-  console.warn("[generateDraft] LLM call is a stub — returning placeholder prose.");
-  return [
-    "ANAMNESE:",
-    "Der Patient stellt sich mit den oben genannten Beschwerden vor. Keine Angaben zu weiteren Details.",
-    "---",
-    "KLINISCHER BEFUND:",
-    "[Klinischer Befund ausstehend – bitte ergänzen.]",
-    "---",
-    "BEURTEILUNG:",
-    "Verdacht auf eine Erkrankung im Zusammenhang mit den geschilderten Beschwerden. Bei entsprechender Klinik weitere Diagnostik zu erwägen.",
-    "---",
-    "WEITERES VORGEHEN:",
-    "Weitere Abklärung empfohlen. Wiedervorstellung bei Verschlechterung.",
-  ].join("\n");
+async function callLLM(prompt: string): Promise<string> {
+  // This app runs as a sandboxed brain-app iframe — it does not call any LLM
+  // directly. It asks the host brain to generate via the `llm.complete` bridge
+  // intent. The brain RAGs over its corpus and uses the operator's BYOK model.
+  // See brainBridge.ts.
+  const result = await llmComplete([{ role: "user", content: prompt }]);
+  return result.text;
+}
+
+/** Map a bridge error code to a German message for the UI. */
+function llmErrorMessage(e: unknown): string {
+  const code = e instanceof Error ? e.message : String(e);
+  const map: Record<string, string> = {
+    not_in_brain:
+      "Diese App muss innerhalb eines Brains laufen — sie ist nicht eingebettet.",
+    permission_denied:
+      "Der App fehlt die Berechtigung 'llm.invoke'. Im Brain unter Apps prüfen.",
+    permit_failed:
+      "Das Brain konnte kein Permit ausstellen (Governance-Kernel nicht erreichbar).",
+    missing_messages: "Interner Fehler: keine Eingabe an das Brain übergeben.",
+    llm_complete_timeout: "Zeitüberschreitung bei der Anfrage an das Brain.",
+    llm_complete_network_error: "Netzwerkfehler bei der Anfrage an das Brain.",
+    llm_complete_failed: "Das Brain konnte den Entwurf nicht erzeugen.",
+  };
+  return map[code] || `Fehler bei der Entwurfserstellung: ${code}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -114,9 +124,14 @@ export async function generateDraft(
     return { success: false, errors: validation.errors };
   }
 
-  // 2. Build prompt & call LLM
+  // 2. Build prompt & call the brain via the bridge
   const prompt = buildPrompt(input, promptTemplate);
-  const llmResponse = await callLLM(prompt);
+  let llmResponse: string;
+  try {
+    llmResponse = await callLLM(prompt);
+  } catch (e) {
+    return { success: false, errors: [llmErrorMessage(e)] };
+  }
 
   // 3. Parse LLM response into sections
   const sections = parseSections(llmResponse);

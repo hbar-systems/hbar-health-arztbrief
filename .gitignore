@@ -1,3 +1,6 @@
 node_modules/
-dist/
 .DS_Store
+
+# dist/ is intentionally NOT ignored. The built static bundle is the
+# brain-app `ui_bundle` — the install pipeline clones this repo and serves
+# dist/ directly, so it must be committed. Rebuild with `npm run build`.

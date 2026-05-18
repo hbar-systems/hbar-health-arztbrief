@@ -1,0 +1,52 @@
+# hbar.health — Arztbrief app — brain-app manifest
+#
+# The letter-writing app: structured anamnesis input -> draft Arztbrief.
+# Converted from the standalone Vite SPA in this repo. Installs into a brain
+# via Settings -> Apps (paste this repo's public GitHub URL -> Approve).
+#
+# Schema: registry/schema/brain/app.schema.json (in hbar.world)
+# Created: 2026-05-18
+#
+# REQUIRES the `llm.complete` bridge intent (Route A) in brainfoundry-nous.
+# Until that ships + the brain is redeployed, the app installs and renders
+# but draft generation returns permission_denied.
+
+dialect: brain-app/v1
+id: hbar-health-arztbrief
+name: Arztbrief
+version: 0.1.0
+description: Structured anamnesis input to a draft Arztbrief, generated over the brain's corpus. Draft-only — physician review required.
+license: AGPL-3.0
+
+author:
+  name: hbar
+  url: https://hbar.systems
+  contact: hello@hbar.systems
+
+repo: https://github.com/hbar-systems/hbar-health-arztbrief
+
+tab:
+  label: Arztbrief
+  route: /arztbrief
+  order: 30
+
+entries:
+  ui_bundle: dist/
+
+# The app asks the brain to generate the draft via the `llm.complete` bridge
+# intent. That intent RAG-retrieves over the layers declared below, so the
+# draft draws on the practice corpus — patient histories, Leitlinien, protocols.
+permissions:
+  - llm.invoke
+
+requires_layers:
+  - layer: semantic
+    mode: read
+  - layer: episodic
+    mode: read
+
+requires_endpoints:
+  - POST /chat/rag
+
+engines:
+  brainfoundry-nous: ">=0.8.4"
