@@ -57,10 +57,19 @@ function inputStyle(c: ThemeColors): React.CSSProperties {
 }
 
 function selectStyle(c: ThemeColors): React.CSSProperties {
+  // Strip the native OS select chrome; draw a clean chevron instead.
+  const chevron = `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 4.5l3.5 3.5 3.5-3.5" fill="none" stroke="${c.text}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  )}`;
   return {
     ...inputStyle(c),
     width: "auto",
-    minWidth: 140,
+    minWidth: 160,
+    appearance: "none",
+    WebkitAppearance: "none",
+    cursor: "pointer",
+    paddingRight: "2rem",
+    background: `${c.inputBg} url("${chevron}") no-repeat right 0.6rem center`,
   };
 }
 

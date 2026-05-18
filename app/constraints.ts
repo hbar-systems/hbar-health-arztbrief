@@ -104,12 +104,22 @@ const ALLOWED_SECTION_HEADERS = new Set([
   "ENTWURF",
 ]);
 
-/** Required hedging phrases — at least one must appear in Beurteilung. */
+/** Required hedging phrases — at least one must appear in Beurteilung.
+ * Covers the full vocabulary of German diagnostic hedging, including the
+ * standard abbreviations a brain persona produces ("V. a.", "am ehesten") —
+ * the check detects the *concept* of a hedged assessment, not one literal
+ * spelling. */
 const HEDGING_PHRASES = [
   "Verdacht auf",
+  "V. a.",
+  "V.a.",
   "verdachtsweise",
+  "Verdachtsdiagnose",
+  "Arbeitsdiagnose",
+  "am ehesten",
   "bei entsprechender Klinik",
   "differentialdiagnostisch",
+  "Differentialdiagnose",
   "nicht auszuschließen",
   "möglicherweise",
   "ggf.",
