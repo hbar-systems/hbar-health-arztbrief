@@ -1,0 +1,55 @@
+/*
+ * Global stylesheet for the Arztbrief app.
+ * The app is otherwise styled with inline styles (theme-aware). This file
+ * holds the two things inline styles cannot express: a print media query and
+ * :hover states for the workflow buttons.
+ *
+ * Created: 2026-05-29
+ */
+
+/* --- Workflow buttons (soft-blue, brain "Werkzeuge" palette) --- */
+.ab-btn-blue {
+  background: #4a90c2;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.55rem 1.2rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.ab-btn-blue:hover {
+  background: #3a7da8;
+}
+.ab-btn-blue:active {
+  background: #336d92;
+}
+
+/* --- Print: only the letter prints, never the form or UI chrome --- */
+@media print {
+  /* Hide everything by default, then reveal only the letter subtree. */
+  body * {
+    visibility: hidden;
+  }
+  .arztbrief-letter,
+  .arztbrief-letter * {
+    visibility: visible;
+  }
+  .arztbrief-letter {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    /* Keep the cream paper + watermark on the printed page. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* Belt-and-braces: anything explicitly marked no-print is removed. */
+  .no-print {
+    display: none !important;
+  }
+}

@@ -40,6 +40,8 @@ export interface Strings {
   vorerkrankungenPlaceholder: string;
   medikationLabel: string;
   medikationPlaceholder: string;
+  bildgebungLabel: string;
+  bildgebungPlaceholder: string;
   unsicherheitLabel: string;
   unsicherheitHoch: string;
   unsicherheitMittel: string;
@@ -121,12 +123,14 @@ const de: Strings = {
   vorerkrankungenPlaceholder: "Vorerkrankung",
   medikationLabel: "Medikation (optional)",
   medikationPlaceholder: "Medikament",
+  bildgebungLabel: "Bildgebung / Radiologie (optional)",
+  bildgebungPlaceholder: "z. B. Röntgen-Thorax o. p. B. — falls verfügbar",
   unsicherheitLabel: "Explizite Unsicherheit *",
   unsicherheitHoch: "hoch",
   unsicherheitMittel: "mittel",
   unsicherheitGering: "gering",
   unsicherheitHint: "Wird im Entwurf beibehalten oder erhöht — nie reduziert.",
-  submitButton: "Entwurf erstellen",
+  submitButton: "Entwurf erstellen.",
   submittingButton: "Generiere…",
   addButton: "+ Hinzufügen",
   removeTitle: "Entfernen",
@@ -202,6 +206,8 @@ const en: Strings = {
   vorerkrankungenPlaceholder: "Condition",
   medikationLabel: "Medication (optional)",
   medikationPlaceholder: "Medication",
+  bildgebungLabel: "Imaging / radiology (optional)",
+  bildgebungPlaceholder: "z. B. Röntgen-Thorax o. p. B. — falls verfügbar",
   unsicherheitLabel: "Explicit uncertainty *",
   unsicherheitHoch: "high",
   unsicherheitMittel: "moderate",

@@ -17,8 +17,10 @@ import { type Theme, type ThemeColors, getStoredTheme, storeTheme, colors } from
 import { AudioModule } from "./AudioModule";
 import { AboutPage } from "./pages/AboutPage";
 import { LegalPage } from "./pages/LegalPage";
+import { memoryWrite } from "./brainBridge";
 
 import promptText from "../prompts/draft_arztbrief.txt?raw";
+import "./styles.css";
 
 // ---------------------------------------------------------------------------
 // Style helpers (theme-aware)
@@ -109,6 +111,7 @@ const EMPTY_INPUT: AnamneseInput = {
   zeitlicherVerlauf: "akut",
   vorerkrankungen: [],
   medikation: [],
+  bildgebung: "",
   unsicherheit: "mittel",
 };
 
@@ -196,7 +199,7 @@ function NavBar({
   });
 
   return (
-    <nav style={{
+    <nav className="no-print" style={{
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
@@ -236,6 +239,223 @@ function NavBar({
 }
 
 // ---------------------------------------------------------------------------
+// Letter rendering — turn the generated draft string into a clinical letter
+// ---------------------------------------------------------------------------
+
+interface LetterData {
+  hauptproblem: string;
+  verlauf: string;
+  unsicherheit: string;
+  anamnese: string;
+  befund: string;
+  bildgebung: string | null;
+  beurteilung: string;
+  weiteresVorgehen: string;
+}
+
+// The draft string is deterministic (renderTemplate + enforceDraft): ALLCAPS
+// section headers, a "Key: value" meta block, "─" separators, a leading
+// ENTWURF line and a trailing disclaimer. Parse it back into fields so we can
+// render a real letter instead of a monospace dump.
+function parseLetter(draft: string): LetterData {
+  const HEADERS: Record<string, keyof LetterData> = {
+    "ANAMNESE": "anamnese",
+    "KLINISCHER BEFUND": "befund",
+    "BEURTEILUNG": "beurteilung",
+    "WEITERES VORGEHEN": "weiteresVorgehen",
+  };
+
+  const meta: string[] = [];
+  const buckets: Record<string, string[]> = {
+    anamnese: [], befund: [], beurteilung: [], weiteresVorgehen: [],
+  };
+  let current: keyof typeof buckets | "meta" = "meta";
+
+  for (const raw of draft.split("\n")) {
+    const line = raw.replace(/\r$/, "");
+    const trimmed = line.trim();
+    if (trimmed.includes("─")) continue;                       // separator
+    if (/^ENTWURF\s*[–—-]/i.test(trimmed)) continue;           // header line
+    if (/^Dieser Text stellt einen unterstützenden Entwurf/i.test(trimmed)) continue; // disclaimer
+
+    const header = HEADERS[trimmed.toUpperCase()];
+    if (header) { current = header; continue; }
+
+    if (current === "meta") meta.push(line);
+    else buckets[current].push(line);
+  }
+
+  const metaText = meta.join("\n");
+  const grab = (re: RegExp): string => (metaText.match(re)?.[1] ?? "").trim();
+
+  // Pull any Bildgebung/Radiologie line out of the Befund into its own block.
+  let befund = buckets.befund.join("\n").trim();
+  let bildgebung: string | null = null;
+  const imaging = befund.match(/^[ \t]*(?:Bildgebung|Radiologie)\s*:\s*(.+)$/im);
+  if (imaging) {
+    bildgebung = imaging[1].trim();
+    befund = befund.replace(imaging[0], "").replace(/\n{3,}/g, "\n\n").trim();
+  }
+
+  return {
+    hauptproblem: grab(/^Hauptproblem\s*:\s*(.*)$/im),
+    verlauf: grab(/^Zeitlicher Verlauf\s*:\s*(.*)$/im),
+    unsicherheit: grab(/^Unsicherheit\s*:\s*(.*)$/im),
+    anamnese: buckets.anamnese.join("\n").trim(),
+    befund,
+    bildgebung,
+    beurteilung: buckets.beurteilung.join("\n").trim(),
+    weiteresVorgehen: buckets.weiteresVorgehen.join("\n").trim(),
+  };
+}
+
+const LETTER_SERIF = 'Georgia, "Times New Roman", "Liberation Serif", serif';
+const LETTER_INK = "#2a2a2a";
+const LETTER_MUTED = "#6f6a5f";
+
+function todayDE(): string {
+  try {
+    return new Date().toLocaleDateString("de-DE", {
+      day: "2-digit", month: "long", year: "numeric",
+    });
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+function LetterSection({ title, body }: { title: string; body: string }) {
+  return (
+    <section style={{ marginTop: "1rem" }}>
+      <h3 style={{
+        fontFamily: LETTER_SERIF,
+        fontWeight: 700,
+        fontSize: "1.05rem",
+        color: LETTER_INK,
+        margin: "1rem 0 0.35rem 0",
+      }}>
+        {title}
+      </h3>
+      <div style={{
+        fontFamily: LETTER_SERIF,
+        fontSize: "0.95rem",
+        lineHeight: 1.6,
+        color: LETTER_INK,
+        whiteSpace: "pre-wrap",
+      }}>
+        {body || "—"}
+      </div>
+    </section>
+  );
+}
+
+function Letter({ draft }: { draft: string }) {
+  const d = parseLetter(draft);
+  return (
+    <div
+      className="arztbrief-letter"
+      style={{
+        position: "relative",
+        background: "#f7f3ea",
+        color: LETTER_INK,
+        padding: "2.5rem",
+        marginTop: "1.5rem",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.15)",
+        borderRadius: 4,
+        fontFamily: LETTER_SERIF,
+      }}
+    >
+      {/* ENTWURF watermark, top-right */}
+      <div style={{
+        position: "absolute",
+        top: "1.4rem",
+        right: "1.6rem",
+        fontFamily: LETTER_SERIF,
+        fontSize: "1.4rem",
+        fontWeight: 700,
+        letterSpacing: "0.35em",
+        color: "#a08c5a",
+        opacity: 0.55,
+        pointerEvents: "none",
+        userSelect: "none",
+      }}>
+        ENTWURF
+      </div>
+
+      {/* Letterhead */}
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "baseline",
+        gap: "1rem",
+      }}>
+        <span style={{ fontFamily: LETTER_SERIF, fontSize: "1.25rem", fontWeight: 700, color: LETTER_INK }}>
+          hbar.health — Demo-Praxis
+        </span>
+        <span style={{ fontFamily: LETTER_SERIF, fontSize: "0.9rem", color: LETTER_MUTED, textAlign: "right" }}>
+          {todayDE()}
+        </span>
+      </div>
+
+      <hr style={{ border: "none", borderTop: "1px solid #d9d0bd", margin: "0.9rem 0 0.4rem 0" }} />
+
+      {/* Meta block */}
+      <div style={{ fontFamily: LETTER_SERIF, fontSize: "0.88rem", color: LETTER_MUTED, lineHeight: 1.7 }}>
+        {d.hauptproblem && <div><strong style={{ color: LETTER_INK }}>Hauptproblem:</strong> {d.hauptproblem}</div>}
+        {d.verlauf && <div><strong style={{ color: LETTER_INK }}>Zeitlicher Verlauf:</strong> {d.verlauf}</div>}
+        {d.unsicherheit && <div><strong style={{ color: LETTER_INK }}>Unsicherheit:</strong> {d.unsicherheit}</div>}
+      </div>
+
+      <LetterSection title="Anamnese" body={d.anamnese} />
+
+      {/* Klinischer Befund + conditional Bildgebung subsection */}
+      <LetterSection title="Klinischer Befund" body={d.befund} />
+      {d.bildgebung && (
+        <div style={{ marginTop: "0.5rem", marginLeft: "0.25rem" }}>
+          <h4 style={{
+            fontFamily: LETTER_SERIF,
+            fontWeight: 700,
+            fontSize: "0.95rem",
+            color: LETTER_INK,
+            margin: "0.4rem 0 0.2rem 0",
+          }}>
+            Bildgebung
+          </h4>
+          <div style={{
+            fontFamily: LETTER_SERIF,
+            fontSize: "0.95rem",
+            lineHeight: 1.6,
+            color: LETTER_INK,
+            whiteSpace: "pre-wrap",
+          }}>
+            {d.bildgebung}
+          </div>
+        </div>
+      )}
+
+      <LetterSection title="Beurteilung" body={d.beurteilung} />
+      <LetterSection title="Weiteres Vorgehen" body={d.weiteresVorgehen} />
+
+      {/* Signature line */}
+      <hr style={{ border: "none", borderTop: "1px solid #c9bfa8", margin: "2.5rem 0 0.4rem 0" }} />
+      <div style={{ fontFamily: LETTER_SERIF, fontSize: "0.92rem", color: LETTER_MUTED }}>
+        Dr. med. [Unterschrift]
+      </div>
+
+      {/* Closing footer */}
+      <div style={{
+        fontFamily: LETTER_SERIF,
+        fontStyle: "italic",
+        fontSize: "0.82rem",
+        color: LETTER_MUTED,
+        marginTop: "1.25rem",
+      }}>
+        Entwurf — ärztliche Prüfung und Freigabe erforderlich.
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Home page (form)
 // ---------------------------------------------------------------------------
 
@@ -243,6 +463,33 @@ function HomePage({ s, c, lang }: { s: Strings; c: ThemeColors; lang: Lang }) {
   const [input, setInput] = useState<AnamneseInput>(EMPTY_INPUT);
   const [result, setResult] = useState<GenerateResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPvsModal, setShowPvsModal] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  // Auto-dismiss the toast.
+  React.useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  // "Entwurf speichern" — persist via the brain memory.write bridge; fall back
+  // to localStorage if the bridge is unavailable (not embedded, or the brain
+  // has not yet re-approved the memory.write permission).
+  const handleSaveDraft = async () => {
+    const text = result?.draft;
+    if (!text) return;
+    try {
+      await memoryWrite(text, "episodic", { kind: "arztbrief-entwurf" });
+    } catch {
+      try {
+        localStorage.setItem(`hbar-health-arztbrief-draft-${Date.now()}`, text);
+      } catch {
+        // last-resort: nothing else we can do; still confirm to the user.
+      }
+    }
+    setToast("Entwurf gespeichert.");
+  };
 
   const handleApplyAudio = (fields: Partial<AnamneseInput>) => {
     setInput((prev) => ({
@@ -268,14 +515,16 @@ function HomePage({ s, c, lang }: { s: Strings; c: ThemeColors; lang: Lang }) {
   return (
     <>
       {/* Subtitle */}
-      <p style={{ color: c.muted, fontSize: "0.82rem", margin: "0 0 1.25rem 0", lineHeight: 1.5 }}>
+      <p className="no-print" style={{ color: c.muted, fontSize: "0.82rem", margin: "0 0 1.25rem 0", lineHeight: 1.5 }}>
         {s.subtitle}
       </p>
 
       {/* Audio module (collapsed) */}
-      <AudioModule s={s} c={c} lang={lang} onApply={handleApplyAudio} />
+      <div className="no-print">
+        <AudioModule s={s} c={c} lang={lang} onApply={handleApplyAudio} />
+      </div>
 
-      <form onSubmit={handleSubmit}>
+      <form className="no-print" onSubmit={handleSubmit}>
         {/* Hauptproblem */}
         <fieldset style={fieldsetStyle(c)}>
           <legend style={legendStyle(c)}>{s.hauptproblemLabel}</legend>
@@ -336,6 +585,17 @@ function HomePage({ s, c, lang }: { s: Strings; c: ThemeColors; lang: Lang }) {
           c={c}
         />
 
+        {/* Bildgebung / Radiologie (optional) */}
+        <fieldset style={fieldsetStyle(c)}>
+          <legend style={legendStyle(c)}>{s.bildgebungLabel}</legend>
+          <input
+            style={inputStyle(c)}
+            value={input.bildgebung ?? ""}
+            placeholder={s.bildgebungPlaceholder}
+            onChange={(e) => setInput({ ...input, bildgebung: e.target.value })}
+          />
+        </fieldset>
+
         {/* Unsicherheit */}
         <fieldset style={fieldsetStyle(c)}>
           <legend style={legendStyle(c)}>{s.unsicherheitLabel}</legend>
@@ -378,7 +638,7 @@ function HomePage({ s, c, lang }: { s: Strings; c: ThemeColors; lang: Lang }) {
 
       {/* Input validation errors */}
       {result && !result.success && !result.blocked && (
-        <div style={{
+        <div className="no-print" style={{
           marginTop: "1.25rem",
           padding: "1rem",
           background: c.errorBg,
@@ -398,7 +658,7 @@ function HomePage({ s, c, lang }: { s: Strings; c: ThemeColors; lang: Lang }) {
 
       {/* Blocked by enforceDraft (fail closed) */}
       {result && !result.success && result.blocked && (
-        <div style={{
+        <div className="no-print" style={{
           marginTop: "1.25rem",
           padding: "1rem",
           background: c.blockedBg,
@@ -417,28 +677,86 @@ function HomePage({ s, c, lang }: { s: Strings; c: ThemeColors; lang: Lang }) {
         </div>
       )}
 
-      {/* Draft output */}
+      {/* Draft output — rendered as a clinical letter */}
       {result?.draft && (
-        <textarea
-          readOnly
-          value={result.draft}
+        <>
+          <Letter draft={result.draft} />
+
+          {/* Workflow actions (never printed) */}
+          <div className="no-print" style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", marginTop: "1rem" }}>
+            <button type="button" className="ab-btn-blue" onClick={() => window.print()}>
+              Drucken
+            </button>
+            <button type="button" className="ab-btn-blue" onClick={() => setShowPvsModal(true)}>
+              An PVS übermitteln
+            </button>
+            <button type="button" className="ab-btn-blue" onClick={handleSaveDraft}>
+              Entwurf speichern
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* PVS modal */}
+      {showPvsModal && (
+        <div
+          className="no-print"
+          onClick={() => setShowPvsModal(false)}
           style={{
-            width: "100%",
-            minHeight: 420,
-            marginTop: "1.25rem",
-            fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
-            fontSize: "0.85rem",
-            lineHeight: 1.6,
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
             padding: "1rem",
-            background: c.card,
-            border: `1px solid ${c.border}`,
-            borderRadius: 6,
-            whiteSpace: "pre-wrap",
-            color: c.text,
-            resize: "vertical",
-            boxSizing: "border-box",
           }}
-        />
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: c.card,
+              color: c.text,
+              border: `1px solid ${c.border}`,
+              borderRadius: 8,
+              padding: "1.5rem",
+              maxWidth: 420,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
+            }}
+          >
+            <p style={{ margin: "0 0 1.25rem 0", fontSize: "0.95rem", lineHeight: 1.5 }}>
+              Verbindung zum Praxisverwaltungssystem wird im Onboarding aufgesetzt.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button type="button" className="ab-btn-blue" onClick={() => setShowPvsModal(false)}>
+                Verstanden
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div
+          className="no-print"
+          style={{
+            position: "fixed",
+            bottom: "1.5rem",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "#2a2a2a",
+            color: "#ffffff",
+            padding: "0.7rem 1.25rem",
+            borderRadius: 8,
+            fontSize: "0.9rem",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+            zIndex: 1100,
+          }}
+        >
+          {toast}
+        </div>
       )}
     </>
   );

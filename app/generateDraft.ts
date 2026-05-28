@@ -68,7 +68,9 @@ function buildPrompt(input: AnamneseInput, promptTemplate: string): string {
       ? input.medikation.map((m) => `  – ${m}`).join("\n")
       : "  – keine angegeben";
 
-  return [
+  const bildgebung = input.bildgebung?.trim();
+
+  const lines = [
     promptTemplate,
     "",
     "EINGABEDATEN:",
@@ -84,7 +86,18 @@ function buildPrompt(input: AnamneseInput, promptTemplate: string): string {
     "",
     "Medikation:",
     medikation,
-  ].join("\n");
+  ];
+
+  if (bildgebung) {
+    lines.push(
+      "",
+      "Bildgebung / Radiologie:",
+      `  – ${bildgebung}`,
+      "(Diese Angabe als Zeile 'Bildgebung: …' in den Klinischen Befund übernehmen.)"
+    );
+  }
+
+  return lines.join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -167,6 +180,16 @@ export async function generateDraft(
 
   // 3. Parse LLM response into sections
   const sections = parseSections(llmResponse);
+
+  // 3a. Imaging: if the operator supplied a Bildgebung note and the model did
+  // not already echo it, prepend it as a "Bildgebung:" line inside the
+  // Klinischer Befund. The letter renderer pulls any "Bildgebung:"/"Radiologie:"
+  // line into a dedicated subsection — this makes that block reliable for a
+  // demo without relying on the model to repeat the input verbatim.
+  const bildgebung = input.bildgebung?.trim();
+  if (bildgebung && !/\b(Bildgebung|Radiologie)\s*:/i.test(sections.klinischerBefund)) {
+    sections.klinischerBefund = `Bildgebung: ${bildgebung}\n${sections.klinischerBefund}`;
+  }
 
   // 4. Assemble into template
   const raw = renderTemplate(input, sections);

@@ -92,3 +92,81 @@ export function llmComplete(messages: BridgeMessage[]): Promise<LlmResult> {
     );
   });
 }
+
+// ---------------------------------------------------------------------------
+// memory.write — persist a chunk into one of the brain's memory layers.
+// ---------------------------------------------------------------------------
+
+export interface MemoryWriteResult {
+  /** Memory append id assigned by the brain. */
+  id?: string;
+  /** Document name the chunk landed under. */
+  doc_name?: string;
+}
+
+/** memory.write proxies to /memory/append and is comparatively quick. */
+const MEMORY_TIMEOUT_MS = 30_000;
+
+/**
+ * Ask the host brain to append `content` into a memory layer. Mirrors the
+ * `llm.complete` flow: post a `memory.write` intent to the host shell, await
+ * the matching reply. The host gates on the manifest's `memory.write`
+ * permission + a write/append layer in requires_layers.
+ *
+ * Rejects with an Error whose message is the bridge error code
+ * (not_in_brain | permission_denied | missing_layer | layer_not_declared
+ *  | memory_append_failed | memory_append_network_error | memory_write_timeout).
+ */
+export function memoryWrite(
+  content: string,
+  layer: "episodic" | "semantic" | "procedural" = "episodic",
+  metadata: Record<string, unknown> = {}
+): Promise<MemoryWriteResult> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === "undefined" || window.parent === window) {
+      reject(new Error("not_in_brain"));
+      return;
+    }
+
+    const request_id = nextRequestId();
+    let settled = false;
+
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      window.removeEventListener("message", onReply);
+      fn();
+    };
+
+    const timer = setTimeout(
+      () => finish(() => reject(new Error("memory_write_timeout"))),
+      MEMORY_TIMEOUT_MS
+    );
+
+    function onReply(event: MessageEvent) {
+      const msg = event.data;
+      if (!msg || typeof msg !== "object") return;
+      if (msg.type !== "reply" || msg.request_id !== request_id) return;
+      finish(() => {
+        if (msg.ok) {
+          const r = msg.result || {};
+          resolve({ id: r.id, doc_name: r.doc_name });
+        } else {
+          const code = (msg.error && msg.error.code) || "memory_append_failed";
+          reject(new Error(String(code)));
+        }
+      });
+    }
+
+    window.addEventListener("message", onReply);
+    window.parent.postMessage(
+      {
+        type: "memory.write",
+        request_id,
+        payload: { layer, content, source: "hbar-health-arztbrief", metadata },
+      },
+      "*"
+    );
+  });
+}

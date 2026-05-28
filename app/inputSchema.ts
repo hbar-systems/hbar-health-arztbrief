@@ -19,6 +19,8 @@ export interface AnamneseInput {
   vorerkrankungen: string[];
   /** Current medication — optional */
   medikation: string[];
+  /** Imaging / radiology findings — optional free text (e.g. "Röntgen-Thorax o. p. B.") */
+  bildgebung?: string;
   /** Explicit uncertainty level — REQUIRED */
   unsicherheit: Unsicherheit;
 }
