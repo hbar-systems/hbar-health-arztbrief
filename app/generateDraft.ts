@@ -21,13 +21,45 @@ export interface GenerateResult {
 // LLM call — via the brain-app bridge
 // ---------------------------------------------------------------------------
 
+// Dev-mode sample so the letter + buttons can be tested with `npm run dev`,
+// outside a brain. The prose sections use hedged Arztdeutsch so the draft
+// passes enforceDraft(). ONLY used when import.meta.env.DEV is true AND the
+// bridge reports not_in_brain — production builds (served inside the brain)
+// always hit the real llm.complete bridge.
+const MOCK_LLM_RESPONSE = [
+  "Anamnese",
+  "Der Patient berichtet über die im Formular dokumentierten Beschwerden im",
+  "angegebenen zeitlichen Verlauf. Die Angaben wurden strukturiert erfasst.",
+  "",
+  "Klinischer Befund",
+  "Klinische Untersuchung im Rahmen der Vorstellung. Befunde sind im weiteren",
+  "Verlauf zu ergänzen.",
+  "",
+  "Beurteilung",
+  "Am ehesten Verdacht auf eine den Beschwerden zugrunde liegende Ursache;",
+  "differentialdiagnostisch sind weitere Abklärungen zu erwägen. Die Einschätzung",
+  "erfolgt unter Vorbehalt und ersetzt keine ärztliche Beurteilung.",
+  "",
+  "Procedere",
+  "Weiterführende Diagnostik ggf. zu erwägen. Wiedervorstellung bei",
+  "Beschwerdepersistenz oder -progredienz empfohlen.",
+].join("\n");
+
 async function callLLM(prompt: string): Promise<string> {
   // This app runs as a sandboxed brain-app iframe — it does not call any LLM
   // directly. It asks the host brain to generate via the `llm.complete` bridge
   // intent. The brain RAGs over its corpus and uses the operator's BYOK model.
   // See brainBridge.ts.
-  const result = await llmComplete([{ role: "user", content: prompt }]);
-  return result.text;
+  try {
+    const result = await llmComplete([{ role: "user", content: prompt }]);
+    return result.text;
+  } catch (e) {
+    const code = e instanceof Error ? e.message : String(e);
+    if (import.meta.env.DEV && code === "not_in_brain") {
+      return MOCK_LLM_RESPONSE;
+    }
+    throw e;
+  }
 }
 
 /** Map a bridge error code to a German message for the UI. */

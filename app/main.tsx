@@ -501,8 +501,13 @@ function HomePage({ s, c, lang }: { s: Strings; c: ThemeColors; lang: Lang }) {
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    // The app runs in a sandboxed iframe (sandbox="allow-scripts
+    // allow-same-origin") with NO allow-forms — the browser blocks native form
+    // submission and never fires the submit event. So generation is driven by
+    // the button's onClick, not form submit. This handler tolerates being
+    // called with or without an event.
+    e?.preventDefault();
     setLoading(true);
     try {
       const res = await generateDraft(input, promptText);
@@ -618,7 +623,8 @@ function HomePage({ s, c, lang }: { s: Strings; c: ThemeColors; lang: Lang }) {
         </fieldset>
 
         <button
-          type="submit"
+          type="button"
+          onClick={() => handleSubmit()}
           disabled={loading}
           style={{
             marginTop: "0.5rem",
