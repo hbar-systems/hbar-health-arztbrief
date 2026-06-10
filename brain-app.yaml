@@ -13,9 +13,9 @@
 
 dialect: brain-app/v1
 id: hbar-health-arztbrief
-name: Arztbrief
-version: 0.2.0
-description: Structured anamnesis input to a draft Arztbrief, generated over the brain's corpus. Draft-only — physician review required.
+name: Praxis-Tools
+version: 0.3.0
+description: Task suite for a German practice — Arztbrief drafting, incoming-letter summary, reply drafting, audit Protokoll. Draft-only — physician review required.
 license: AGPL-3.0
 
 author:
@@ -26,7 +26,7 @@ author:
 repo: https://github.com/hbar-systems/hbar-health-arztbrief
 
 tab:
-  label: Arztbrief
+  label: Praxis
   route: /arztbrief
   order: 30
 

@@ -17,6 +17,12 @@ import { type Theme, type ThemeColors, getStoredTheme, storeTheme, colors } from
 import { AudioModule } from "./AudioModule";
 import { AboutPage } from "./pages/AboutPage";
 import { LegalPage } from "./pages/LegalPage";
+import { TaskHome } from "./pages/TaskHome";
+import { SummaryPage } from "./pages/SummaryPage";
+import { ReplyPage } from "./pages/ReplyPage";
+import { ProtokollPage } from "./pages/ProtokollPage";
+import { copyText } from "./pages/shared";
+import { tt, type TaskStrings } from "./i18nTasks";
 import { memoryWrite } from "./brainBridge";
 
 import promptText from "../prompts/draft_arztbrief.txt?raw";
@@ -456,10 +462,10 @@ function Letter({ draft }: { draft: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Home page (form)
+// Arztbrief page (the structured anamnesis form — formerly the home page)
 // ---------------------------------------------------------------------------
 
-function HomePage({ s, c, lang }: { s: Strings; c: ThemeColors; lang: Lang }) {
+function ArztbriefPage({ s, c, lang, ts }: { s: Strings; c: ThemeColors; lang: Lang; ts: TaskStrings }) {
   const [input, setInput] = useState<AnamneseInput>(EMPTY_INPUT);
   const [result, setResult] = useState<GenerateResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -491,6 +497,15 @@ function HomePage({ s, c, lang }: { s: Strings; c: ThemeColors; lang: Lang }) {
     setToast("Entwurf gespeichert.");
   };
 
+  // "In Zwischenablage kopieren" — the PVS bridge: plain-text draft into the
+  // clipboard, the MFA pastes it into the practice's PVS.
+  const handleCopyDraft = async () => {
+    const text = result?.draft;
+    if (!text) return;
+    const ok = await copyText(text);
+    setToast(ok ? ts.copiedToast : ts.copyFailedToast);
+  };
+
   const handleApplyAudio = (fields: Partial<AnamneseInput>) => {
     setInput((prev) => ({
       ...prev,
@@ -519,6 +534,13 @@ function HomePage({ s, c, lang }: { s: Strings; c: ThemeColors; lang: Lang }) {
 
   return (
     <>
+      {/* Back to tasks */}
+      <div className="no-print" style={{ marginBottom: "0.5rem" }}>
+        <Link to="/" style={{ fontSize: "0.8rem", color: c.muted, textDecoration: "none" }}>
+          {ts.backToTasks}
+        </Link>
+      </div>
+
       {/* Subtitle */}
       <p className="no-print" style={{ color: c.muted, fontSize: "0.82rem", margin: "0 0 1.25rem 0", lineHeight: 1.5 }}>
         {s.subtitle}
@@ -690,6 +712,9 @@ function HomePage({ s, c, lang }: { s: Strings; c: ThemeColors; lang: Lang }) {
 
           {/* Workflow actions (never printed) */}
           <div className="no-print" style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", marginTop: "1rem" }}>
+            <button type="button" className="ab-btn-blue" onClick={handleCopyDraft}>
+              {ts.copyButton}
+            </button>
             <button type="button" className="ab-btn-blue" onClick={() => window.print()}>
               Drucken
             </button>
@@ -777,6 +802,7 @@ function App() {
   const [theme, setTheme] = useState<Theme>(getStoredTheme);
 
   const s = t(lang);
+  const ts = tt(lang);
   const c = colors(theme);
 
   const toggleLang = () => {
@@ -796,7 +822,11 @@ function App() {
       <div style={{ maxWidth: 680, margin: "0 auto", paddingTop: "1rem", paddingBottom: "3rem" }}>
         <NavBar s={s} c={c} lang={lang} theme={theme} onToggleLang={toggleLang} onToggleTheme={toggleTheme} />
         <Routes>
-          <Route path="/" element={<HomePage s={s} c={c} lang={lang} />} />
+          <Route path="/" element={<TaskHome ts={ts} c={c} />} />
+          <Route path="/arztbrief" element={<ArztbriefPage s={s} c={c} lang={lang} ts={ts} />} />
+          <Route path="/zusammenfassung" element={<SummaryPage ts={ts} c={c} />} />
+          <Route path="/antwort" element={<ReplyPage ts={ts} c={c} />} />
+          <Route path="/protokoll" element={<ProtokollPage ts={ts} c={c} />} />
           <Route path="/about" element={<AboutPage s={s} c={c} />} />
           <Route path="/legal" element={<LegalPage s={s} c={c} />} />
         </Routes>

@@ -8,6 +8,7 @@ import { validateInput, enforceDraft } from "./constraints";
 import { renderTemplate, type GeneratedSections } from "./template";
 import { postprocess } from "./postprocess";
 import { llmComplete } from "./brainBridge";
+import { logAudit } from "./audit";
 
 export interface GenerateResult {
   success: boolean;
@@ -15,6 +16,10 @@ export interface GenerateResult {
   errors?: string[];
   /** true when enforceDraft() blocked the output (fail closed) */
   blocked?: boolean;
+  /** model the brain reported using (for the Protokoll) */
+  model?: string;
+  /** corpus sources the RAG step retrieved */
+  sources?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -45,18 +50,19 @@ const MOCK_LLM_RESPONSE = [
   "Beschwerdepersistenz oder -progredienz empfohlen.",
 ].join("\n");
 
-async function callLLM(prompt: string): Promise<string> {
+async function callLLM(
+  prompt: string
+): Promise<{ text: string; model: string; sources: string[] }> {
   // This app runs as a sandboxed brain-app iframe — it does not call any LLM
   // directly. It asks the host brain to generate via the `llm.complete` bridge
   // intent. The brain RAGs over its corpus and uses the operator's BYOK model.
   // See brainBridge.ts.
   try {
-    const result = await llmComplete([{ role: "user", content: prompt }]);
-    return result.text;
+    return await llmComplete([{ role: "user", content: prompt }]);
   } catch (e) {
     const code = e instanceof Error ? e.message : String(e);
     if (import.meta.env.DEV && code === "not_in_brain") {
-      return MOCK_LLM_RESPONSE;
+      return { text: MOCK_LLM_RESPONSE, model: "mock (dev)", sources: [] };
     }
     throw e;
   }
@@ -203,12 +209,34 @@ export async function generateDraft(
 
   // 2. Build prompt & call the brain via the bridge
   const prompt = buildPrompt(input, promptTemplate);
+  const started = Date.now();
   let llmResponse: string;
+  let model = "—";
+  let sources: string[] = [];
   try {
-    llmResponse = await callLLM(prompt);
+    const r = await callLLM(prompt);
+    llmResponse = r.text;
+    model = r.model || "—";
+    sources = r.sources;
   } catch (e) {
+    logAudit({
+      ts: new Date().toISOString(),
+      task: "Arztbrief",
+      model: "—",
+      sources: 0,
+      ok: false,
+      ms: Date.now() - started,
+    });
     return { success: false, errors: [llmErrorMessage(e)] };
   }
+  logAudit({
+    ts: new Date().toISOString(),
+    task: "Arztbrief",
+    model,
+    sources: sources.length,
+    ok: true,
+    ms: Date.now() - started,
+  });
 
   // 3. Parse LLM response into sections
   const sections = parseSections(llmResponse);
@@ -233,8 +261,8 @@ export async function generateDraft(
   const enforced = enforceDraft(draft, input);
 
   if (!enforced.ok) {
-    return { success: false, blocked: true, errors: enforced.errors };
+    return { success: false, blocked: true, errors: enforced.errors, model, sources };
   }
 
-  return { success: true, draft: enforced.text };
+  return { success: true, draft: enforced.text, model, sources };
 }
