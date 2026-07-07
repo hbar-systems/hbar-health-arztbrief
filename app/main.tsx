@@ -17,10 +17,6 @@ import { type Theme, type ThemeColors, getStoredTheme, storeTheme, colors } from
 import { AudioModule } from "./AudioModule";
 import { AboutPage } from "./pages/AboutPage";
 import { LegalPage } from "./pages/LegalPage";
-import { TaskHome } from "./pages/TaskHome";
-import { SummaryPage } from "./pages/SummaryPage";
-import { ReplyPage } from "./pages/ReplyPage";
-import { ProtokollPage } from "./pages/ProtokollPage";
 import { copyText } from "./pages/shared";
 import { tt, type TaskStrings } from "./i18nTasks";
 import { memoryWrite } from "./brainBridge";
@@ -534,13 +530,6 @@ function ArztbriefPage({ s, c, lang, ts }: { s: Strings; c: ThemeColors; lang: L
 
   return (
     <>
-      {/* Back to tasks */}
-      <div className="no-print" style={{ marginBottom: "0.5rem" }}>
-        <Link to="/" style={{ fontSize: "0.8rem", color: c.muted, textDecoration: "none" }}>
-          {ts.backToTasks}
-        </Link>
-      </div>
-
       {/* Subtitle */}
       <p className="no-print" style={{ color: c.muted, fontSize: "0.82rem", margin: "0 0 1.25rem 0", lineHeight: 1.5 }}>
         {s.subtitle}
@@ -822,11 +811,7 @@ function App() {
       <div style={{ maxWidth: 680, margin: "0 auto", paddingTop: "1rem", paddingBottom: "3rem" }}>
         <NavBar s={s} c={c} lang={lang} theme={theme} onToggleLang={toggleLang} onToggleTheme={toggleTheme} />
         <Routes>
-          <Route path="/" element={<TaskHome ts={ts} c={c} />} />
-          <Route path="/arztbrief" element={<ArztbriefPage s={s} c={c} lang={lang} ts={ts} />} />
-          <Route path="/zusammenfassung" element={<SummaryPage ts={ts} c={c} />} />
-          <Route path="/antwort" element={<ReplyPage ts={ts} c={c} />} />
-          <Route path="/protokoll" element={<ProtokollPage ts={ts} c={c} />} />
+          <Route path="/" element={<ArztbriefPage s={s} c={c} lang={lang} ts={ts} />} />
           <Route path="/about" element={<AboutPage s={s} c={c} />} />
           <Route path="/legal" element={<LegalPage s={s} c={c} />} />
         </Routes>
