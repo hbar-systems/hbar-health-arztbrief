@@ -28,6 +28,7 @@ export function storeLang(lang: Lang): void {
 export interface Strings {
   brand: string;
   subtitle: string;
+  beispielLabel: string;
   hauptproblemLabel: string;
   hauptproblemPlaceholder: string;
   beschwerdenLabel: string;
@@ -111,6 +112,7 @@ export interface Strings {
 const de: Strings = {
   brand: "hbar.health",
   subtitle: "Strukturierte Anamnese → ENTWURF Arztbrief. Kein Chat. Keine Diagnose.",
+  beispielLabel: "Beispiel laden:",
   hauptproblemLabel: "Hauptproblem *",
   hauptproblemPlaceholder: "Kurze Beschreibung des Hauptproblems",
   beschwerdenLabel: "Aktuelle Beschwerden *",
@@ -194,6 +196,7 @@ const de: Strings = {
 const en: Strings = {
   brand: "hbar.health",
   subtitle: "Structured anamnesis → DRAFT Arztbrief. No chat. No diagnosis.",
+  beispielLabel: "Load example:",
   hauptproblemLabel: "Main problem *",
   hauptproblemPlaceholder: "Brief description of the main problem",
   beschwerdenLabel: "Current complaints *",

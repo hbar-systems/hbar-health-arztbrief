@@ -14,7 +14,7 @@
 dialect: brain-app/v1
 id: hbar-health-arztbrief
 name: Arztbrief
-version: 0.4.0
+version: 0.4.1
 description: Strukturierte Anamnese-Eingabe → Arztbrief-Entwurf in formellem Deutsch, klar als ENTWURF gekennzeichnet. Nur Entwurf — ärztliche Prüfung und Freigabe erforderlich.
 license: AGPL-3.0
 

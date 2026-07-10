@@ -117,6 +117,44 @@ const EMPTY_INPUT: AnamneseInput = {
   unsicherheit: "mittel",
 };
 
+// Ready-to-plug demo cases — one-click fill for the demo and first Praxis testers.
+// Content is German (the letter is always German). Safe to delete this block later.
+const EXAMPLE_CASES: { name: string; input: AnamneseInput }[] = [
+  {
+    name: "COPD-Bronchitis",
+    input: {
+      hauptproblem: "Akute Bronchitis bei bekannter COPD",
+      aktuelleBeschwerden: ["Husten mit gelblichem Auswurf", "Belastungsdyspnoe", "kein Fieber"],
+      zeitlicherVerlauf: "akut",
+      vorerkrankungen: ["COPD GOLD II", "arterielle Hypertonie"],
+      medikation: ["Ramipril 5 mg 1-0-0", "Salbutamol bei Bedarf"],
+      unsicherheit: "mittel",
+    },
+  },
+  {
+    name: "Kreuzschmerz",
+    input: {
+      hauptproblem: "Akuter Kreuzschmerz ohne Trauma",
+      aktuelleBeschwerden: ["Lumbaler Druckschmerz", "keine Ausstrahlung", "keine neurologischen Ausfälle"],
+      zeitlicherVerlauf: "akut",
+      vorerkrankungen: ["Adipositas"],
+      medikation: ["Ibuprofen 400 mg bei Bedarf"],
+      unsicherheit: "gering",
+    },
+  },
+  {
+    name: "Diabetes-Kontrolle",
+    input: {
+      hauptproblem: "Routinekontrolle bei Diabetes mellitus Typ 2",
+      aktuelleBeschwerden: ["keine akuten Beschwerden", "HbA1c 7,8 %"],
+      zeitlicherVerlauf: "chronisch",
+      vorerkrankungen: ["Diabetes mellitus Typ 2", "arterielle Hypertonie", "Hyperlipidämie"],
+      medikation: ["Metformin 1000 mg 1-0-1", "Ramipril 5 mg 1-0-0", "Atorvastatin 20 mg 0-0-1"],
+      unsicherheit: "gering",
+    },
+  },
+];
+
 // ---------------------------------------------------------------------------
 // Reusable: dynamic string-list editor
 // ---------------------------------------------------------------------------
@@ -531,9 +569,24 @@ function ArztbriefPage({ s, c, lang, ts }: { s: Strings; c: ThemeColors; lang: L
   return (
     <>
       {/* Subtitle */}
-      <p className="no-print" style={{ color: c.muted, fontSize: "0.82rem", margin: "0 0 1.25rem 0", lineHeight: 1.5 }}>
+      <p className="no-print" style={{ color: c.muted, fontSize: "0.82rem", margin: "0 0 0.75rem 0", lineHeight: 1.5 }}>
         {s.subtitle}
       </p>
+
+      {/* Quick-fill demo examples — one click fills the whole form. Delete later if desired. */}
+      <div className="no-print" style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center", margin: "0 0 1.25rem 0" }}>
+        <span style={{ fontSize: "0.78rem", fontWeight: 600, color: c.muted }}>{s.beispielLabel}</span>
+        {EXAMPLE_CASES.map((ex) => (
+          <button
+            key={ex.name}
+            type="button"
+            onClick={() => { setInput(ex.input); setResult(null); }}
+            style={{ padding: "0.25rem 0.6rem", fontSize: "0.78rem", fontWeight: 600, border: `1px solid ${c.border}`, borderRadius: 999, background: "transparent", color: c.muted, cursor: "pointer" }}
+          >
+            {ex.name}
+          </button>
+        ))}
+      </div>
 
       {/* Audio module (collapsed) */}
       <div className="no-print">
